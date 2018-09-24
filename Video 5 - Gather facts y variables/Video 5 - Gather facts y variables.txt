@@ -1,0 +1,33 @@
+En el video 5 del curso se hace una explicación sobre los facts y el uso de variables. Los facts es la información que ansible recoge de los nodos remotos y que podemos usar
+en nuestros playbooks, como variables para realizar operaciones, o como valores para realizar operaciones en funcion de condiciones sobre elementos del sistema.
+
+Esto lleva a un punto muy importante, cuando se trabaja en funcion de facts para realizar operaciones ansible recoge los facts al principio del playbook que estemos lanzando
+con lo que, si hemos realizado una tarea que ha modificado algo en el host remoto y cualquier tarea siguiente vuelve a realizarse en función de un fact de dicho host, esa
+comparación se realiza contra el fact recogido en el inicio del playbook.
+
+En este caso, el playbook que he hecho cambia el nombre de un interfaz de red solo cuando está activo y pertenece a una determinada subred. Para hacer esto, las tareas que
+son necesarias son las siguientes:
+
+1.- Hacer un down del interfaz del host que esté activo y en una determinada subred.
+2.- Cambiar el nombre del interfaz del host que AHORA no esté activo. Notificar a un handler para que pase a estar activo solo si esta
+    tarea se realiza.
+3.- HANDLER. Levantar el interfaz ya renombrado correctamente.
+
+El punto importante aquí es que, al comienzo del playbook, le decimos a ansible que recoja los facts con:
+
+gather_facts: yes
+
+esto nos lleva a tener unos facts del estado INICIAL de los hosts. En la primera tarea hemos pasado a DOWN ciertos interfaces de cada uno
+de los hosts, lo cual lleva a que en la segunda tarea, para cambiar el nombre bsándonos en si el interfaz está o no activo, necesitamos 
+comprobar el fact correspondiente. Aquí es donde está el punto importante, porque si compruebo el fact en este punto lo estaré haciendo con
+el que recogimos al comienzo del playbook y, en ese momento, todos lo interfaces estaban activos con lo que mi tarea 2 no se realizará.
+Para solucionar esto, la tarea 2 debe ser volver a recoger facts de los hosts, pero como sabemos que es solo de red, lo que hay que hacer 
+es recoger solo el subconjunto correspondiente.
+
+Por tanto, realmente las tareas de este playbook quedaran asi:
+
+1.- Hacer un down del interfaz del host que esté activo y en una determinada subred.
+2.- Refrescar los facts de los hosts. Resringirlo al subconjunto solo de red.
+3.- Cambiar el nombre del interfaz del host que AHORA no esté activo. Notificar a un handler para que pase a estar activo solo si esta
+    tarea se realiza.
+4.- HANDLER. Levantar el interfaz ya renombrado correctamente.

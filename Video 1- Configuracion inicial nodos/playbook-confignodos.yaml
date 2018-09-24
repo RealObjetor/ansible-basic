@@ -1,0 +1,29 @@
+## Este playbook realiza la configuracion inicial descrita en el fichero txt Video 1 - Configuracion inicial de nodos.
+
+---
+- hosts: nodos
+  gather_facts: no
+
+  tasks:
+    - name: Creacion usuario ansible.
+      user:
+        name: ansible
+        state: present
+        password_lock: yes
+        uid: 10001
+        comment: "Ansible user."
+    - name: Modificacion sudoers.
+      template:
+        src: /etc/ansible/templates/sudoers.j2
+        dest: /etc/sudoers.d/ansible
+        mode: 0440
+    - name: Copia clave SSH usuario ansible.  
+      authorized_key:
+        user: ansible
+        state: present
+        manage_dir: yes
+        key: "{{ lookup('file', '/home/ansible/.ssh/id_rsa.pub') }}"
+
+...
+
+

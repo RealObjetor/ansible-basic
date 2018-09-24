@@ -1,0 +1,83 @@
+﻿En el primer video se hace una configuraci�n b�sica de los nodos implicados en el despliegue. En concreto la configuracion basica es la siguiente:
+
+1.- Instalo ansible en mi nodo de control. Esto lo hago a mano en el nodo de control. Si es CentOS uso el repositorio epel (epel-release).
+2.- Crear un usuario para la ejecucion de comandos desde playbooks ansible en todos los nodos. Creo un usuario en el nodo de control que sera
+    el que usare para ejecutar todos los comandos de ansible. Por simplicidad lo llamar� ansible y por seguridad bloqueara el usuario para que
+    no se pueda acceder con el. En mi nodo de control el usuario ansible tiene el UID 10001 con GID 10001 con lo que lo crearemos igual.
+3.- Darle permisos de sudo a ese usuario usando visudo.
+4.- Crear una clave ssh para el usuario creado en el nodo de control y copiarla al resto de nodos.
+
+Ahora, los pasos anteriores los incluire en un playbook para configurar los nodos que tengo definidos en el grupo nodos.
+
+Aunque todavia no lo ha explicado en el curso voy a usar la definicion de un grupo de hosts. Esto consiste en crear un fichero de configuracion
+que es especifico para un grupo y que contiene unas variables de configuracion comunes, este fichero debe llamarse igual que el grupo de hosts. 
+En mi caso el fichero contendra lo siguiente:
+
+/etc/ansible/group_vars/nodos:
+ansible_user: root
+ansible_connection: ssh
+
+sudo_user: ansible
+
+con lo que establezco que para los hosts del grupo nodos hay que usar root para coenctarse mediante ssh. La ultima linea es una variable que 
+luego utilizo en el playbook para hacer uso del modulo template. 
+
+Primer punto encontrado, esta version de ansible es m�s moderna y recomienda no usar la opcion de configuracion sudo_user sino las opciones de 
+configuracion become_ dentro de la seccion privilege_escalation. Sin estas opciones, cuando lanzo cualquier comando ad-hoc con ansible, y por
+tanto cualquier playbook, los comandos remotos se ejecutan como el usuario ansible. Un ejemplo es el siguiente:
+
+ansible -m copy -a "src=/home/ansible/test.txt dest=/tmp/test-copiado.txt" nodos <- Al ejecutar este comando ad-hoc de copia de ficheros, el
+										    propietario del fichero en los nodos destino es el usuario
+										    ansible remoto.
+ansible -a "ls -la /tmp" nodos
+
+-rw-rw-r--.  1 ansible ansible 3025 Sep 17 19:32 test-copiado.txt <- Esto en todos los nodos.
+
+Al intentar hacer algo que requiera permisos del usuario root sin hablitar las opciones become_ obtenemos el error de permiso denegado:
+
+[ansible@centosdocker ~]$ ansible -a "cat /var/log/messages" nodos
+ansible-nodo1 | FAILED | rc=1 >>
+cat: /var/log/messages: Permission deniednon-zero return code
+
+ansible-nodo4 | FAILED | rc=1 >>
+cat: /var/log/messages: Permission deniednon-zero return code
+
+ansible-nodo2 | FAILED | rc=1 >>
+cat: /var/log/messages: Permission deniednon-zero return code
+
+ansible-nodo3 | FAILED | rc=1 >>
+cat: /var/log/messages: Permission deniednon-zero return code
+
+Sin embargo, si habilito las opciones become_ de la sección privilege_escalation dentro del fichero /etc/ansible.cfg, la ejecución de los 
+comandos en los nodos remotos se hace con el usuario root y entonces el resultado es que los ficheros creados son del usuario root:
+
+ansible -m copy -a "src=test.txt dest=/tmp/test-root.txt" nodos <- Ahora el fichero en todos los nodos es del usuario root.
+
+-rw-r--r--.  1 root root 3025 Sep 17 19:39 test-root.txt <- Esto en todos los nodos.
+
+Pero esto no funciona si no configuro el sudo en los nodos remotos, por tanto la configuración de sudo en los nodos remotos es necesaria
+y no hace falta que el usuario que utilice en remoto tenga una cuenta habilitada.
+
+
+El objetivo que busco con este primer playbook es el establecer la configuraci�n necesaria en los nodos para que:
+
+- Crear la cuenta del usuario ansible que usaremos siempre para la ejecuci�n de playbooks. Esto incluye a�adir el usuario al fichero
+  sudoers.
+- Establecer la clave SSH que vamos a usar para no tener que establecer una contrase�a.
+
+Para lanzar este primer playbook el comando a usar sera ansible-playbook --ask-pass init_basic_config.yaml donde lo unico importante es
+que como en el group_vars/nodos he establecido que el usuario a usar es root le especifico que me pida la password de ese usuario para
+realizar la conexion.
+
+Puntos conseguidos en este caso:
+
+1.- Creación del usuario ansible que vamos a usar. Perfecto y además la cuenta de usuario esta bloqueada.
+2.- Configuración de sudo para que el usuario ansible pueda ejecutar comandos como si fuera root y sin pedir password.
+3.- Configuración del usuario ansible para que no pueda accederse con él remotamente salvo por SSH
+    desde el nodo de control. Passwordless SSH.
+
+
+
+
+
+

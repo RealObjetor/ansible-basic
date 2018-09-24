@@ -1,0 +1,57 @@
+## Este playbook realiza la configuracion de red de nodos Linux en los cuales un interfaz tiene un direccionamiento de cluster
+## y el otro interfaz tiene el direccionamiento de servicio. Este playbook debe cambiar los nombres de cada interfaz a cluster
+## y a servicio, donde cada uno se distingue en funcion de su direccionamiento. Este playbook esta pensado para un servidor
+## con solo dos interfaces de red.
+
+---
+- hosts: nodos
+  gather_facts: yes
+
+  tasks:
+    - name: Deshabilitar interfaz de red de cluster.
+      command: ip link set down {{ item }}
+      when: ( hostvars[inventory_hostname]['ansible_' + item]['active'] == true and hostvars[inventory_hostname]['ansible_' + item]['ipv4']['network'] == '192.168.136.0' )
+      with_items:
+        - "{{ hostvars[inventory_hostname]['ansible_interfaces'] }}"
+    - name: Refrescar estado de facts de red.
+      setup:
+        gather_subset: network
+    - name: Cambiar nombre de interfaz de red de cluster.
+      command: ip link set {{ item }} name CLUSTER
+      when: ( hostvars[inventory_hostname]['ansible_' + item]['active'] == false )
+      with_items:
+        - "{{ hostvars[inventory_hostname]['ansible_interfaces'] }}"
+    - name: Levantar el nuevo interfaz de la red de CLUSTER.
+      command: ip link set up CLUSTER
+    - name: Refrescar estado de facts de red.
+      setup:
+        gather_subset: network
+    - name: Copiar el fichero de plantilla de configuracion de los intefaces de red.
+      template:
+        backup: yes
+        mode: 0644
+        src: /etc/ansible/templates/ifcfg-template.j2
+        dest: /tmp/ifcfg-{{ network_interface_cluster if hostvars[inventory_hostname]['ansible_' + item]['ipv4']['network'] == '192.168.136.0' else network_interface_service }}
+      when: ( hostvars[inventory_hostname]['ansible_' + item]['active'] == true and hostvars[inventory_hostname]['ansible_' + item]['ipv4']['network'] == '192.168.136.0' ) or
+            ( hostvars[inventory_hostname]['ansible_' + item]['active'] == true and hostvars[inventory_hostname]['ansible_' + item]['ipv4']['network'] == '192.168.241.0' )
+      with_items:
+        - "{{ hostvars[inventory_hostname]['ansible_interfaces'] }}"
+    - name: Cambiar fichero de configuracion de interfaces para hacer cambio permanente.
+      blockinfile:
+        path: /tmp/ifcfg-{{ network_interface_cluster if hostvars[inventory_hostname]['ansible_' + item]['ipv4']['network'] == '192.168.136.0' else network_interface_service }}
+        backup: yes
+        block: |
+          IPADDR={{ hostvars[inventory_hostname]['ansible_' + item]['ipv4']['address'] }}
+          NETWORK={{ hostvars[inventory_hostname]['ansible_' + item]['ipv4']['network'] }}
+          NETMASK={{ hostvars[inventory_hostname]['ansible_' + item]['ipv4']['netmask'] }}
+          HWADDR={{ hostvars[inventory_hostname]['ansible_' + item]['macaddress'] }}
+          NAME={{ network_interface_cluster if hostvars[inventory_hostname]['ansible_' + item]['ipv4']['network'] == '192.168.136.0' else network_interface_service }}
+          DEVICE={{ network_interface_cluster if hostvars[inventory_hostname]['ansible_' + item]['ipv4']['network'] == '192.168.136.0' else network_interface_service }}
+      when: ( hostvars[inventory_hostname]['ansible_' + item]['active'] == true and hostvars[inventory_hostname]['ansible_' + item]['ipv4']['network'] == '192.168.136.0' ) or
+            ( hostvars[inventory_hostname]['ansible_' + item]['active'] == true and hostvars[inventory_hostname]['ansible_' + item]['ipv4']['network'] == '192.168.241.0' )
+      with_items:
+        - "{{ hostvars[inventory_hostname]['ansible_interfaces'] }}"
+    - name: Cambiar el hostname de cada nodo.
+      command: hostnamectl set-hostname k8-node{{ ansible_play_batch.index(inventory_hostname) | int + 1 }}
+
+...

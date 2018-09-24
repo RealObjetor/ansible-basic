@@ -1,0 +1,12 @@
+## Fichero de variables comunes a los hosts del grupo nodos.
+
+ansible_user: ansible
+ansible_connection: ssh
+
+sudo_user: ansible
+network_interface_cluster: CLUSTER
+network_cluster: 192.168.136.0
+network_interface_service: SERVICIO
+network_service: 192.168.241.0
+name_server_primary: 8.8.8.8
+name_server_secondary: 8.8.4.4

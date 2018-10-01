@@ -8,6 +8,25 @@
   gather_facts: yes
 
   tasks:
+    - name: Cambiar nombre ficheros de configuracion ifcfg.
+      copy:
+        remote_src: yes
+        src: /etc/sysconfig/network-scripts/ifcfg-{{ item }}
+        dest: /etc/sysconfig/network-scripts/DISABLED.ifcfg-{{ item }}
+      when: ( hostvars[inventory_hostname]['ansible_' + item]['active'] == true and hostvars[inventory_hostname]['ansible_' + item]['ipv4']['network'] == network_cluster ) or
+              ( hostvars[inventory_hostname]['ansible_' + item]['active'] == true and hostvars[inventory_hostname]['ansible_' + item]['ipv4']['network'] == network_service )
+      with_items:
+          - "{{ hostvars[inventory_hostname]['ansible_interfaces'] }}"
+      ignore_errors: yes
+    - name: Borra ficheros ifcfg deshabilitados.
+      file:
+        path: /etc/sysconfig/network-scripts/ifcfg-{{ item }}
+        state: absent
+      when: ( hostvars[inventory_hostname]['ansible_' + item]['active'] == true and hostvars[inventory_hostname]['ansible_' + item]['ipv4']['network'] == network_cluster ) or
+            ( hostvars[inventory_hostname]['ansible_' + item]['active'] == true and hostvars[inventory_hostname]['ansible_' + item]['ipv4']['network'] == network_service )
+      with_items:
+        - "{{ hostvars[inventory_hostname]['ansible_interfaces'] }}"
+      ignore_errors: yes
     - name: Deshabilitar interfaz de red de cluster.
       command: ip link set down {{ item }}
       when: ( hostvars[inventory_hostname]['ansible_' + item]['active'] == true and hostvars[inventory_hostname]['ansible_' + item]['ipv4']['network'] == network_cluster )

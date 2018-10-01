@@ -50,14 +50,14 @@
         backup: yes
         mode: 0644
         src: /etc/ansible/templates/ifcfg-template.j2
-        dest: /tmp/ifcfg-{{ network_interface_cluster if hostvars[inventory_hostname]['ansible_' + item]['ipv4']['network'] == network_cluster else network_interface_service }}
+        dest: /etc/sysconfig/network-scripts/ifcfg-{{ network_interface_cluster if hostvars[inventory_hostname]['ansible_' + item]['ipv4']['network'] == network_cluster else network_interface_service }}
       when: ( hostvars[inventory_hostname]['ansible_' + item]['active'] == true and hostvars[inventory_hostname]['ansible_' + item]['ipv4']['network'] == network_cluster ) or
             ( hostvars[inventory_hostname]['ansible_' + item]['active'] == true and hostvars[inventory_hostname]['ansible_' + item]['ipv4']['network'] == network_service )
       with_items:
         - "{{ hostvars[inventory_hostname]['ansible_interfaces'] }}"
     - name: Cambiar fichero de configuracion de interfaces para hacer cambio permanente.
       blockinfile:
-        path: /tmp/ifcfg-{{ network_interface_cluster if hostvars[inventory_hostname]['ansible_' + item]['ipv4']['network'] == network_cluster else network_interface_service }}
+        path: /etc/sysconfig/network-scripts/ifcfg-{{ network_interface_cluster if hostvars[inventory_hostname]['ansible_' + item]['ipv4']['network'] == network_cluster else network_interface_service }}
         backup: yes
         block: |
           IPADDR={{ hostvars[inventory_hostname]['ansible_' + item]['ipv4']['address'] }}
